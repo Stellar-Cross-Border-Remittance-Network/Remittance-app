@@ -3,8 +3,12 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Text } from 'react-native';
 
 import { Button, Card, Screen, StatusBadge, Title } from '../components/ui';
+import { endpoints } from '../lib/api';
+import { getSecure, SecureKeys } from '../lib/secureStore';
+import { signTransaction } from '../lib/stellar';
 import { drainQueue, loadIntents, removeIntent, type TransactionIntent } from '../queue/offlineQueue';
 import { colors, spacing } from '../theme/theme';
+import { env } from '../config/env';
 
 /**
  * Offline queue: shows persisted intents, waits for connectivity, then
@@ -33,11 +37,22 @@ export function OfflineQueueScreen() {
     }
     setDraining(true);
     await drainQueue(
-      // The submit function must rebuild a fresh transaction. In this build
-      // the backend prepares envelopes from fresh sequence state; signing is
-      // wallet-mediated (see docs/WALLET_INTEGRATION.md).
+      // The submit function must rebuild a fresh transaction: for escrow fund
+      // intents we re-prepare a fresh envelope from the backend (fresh
+      // simulation/sequence), sign it on-device and relay it — never a stale
+      // signed envelope. Path-payment intents remain wallet-mediated (see
+      // docs/WALLET_INTEGRATION.md).
       async (intent) => {
-        void intent;
+        if (intent.kind === 'remittance_fund' && intent.remittanceId) {
+          const secret = await getSecure(SecureKeys.localSecret);
+          if (!secret) {
+            throw new Error('No device key found');
+          }
+          const { transactionXdr } = await endpoints.prepareFund(intent.remittanceId);
+          const signed = signTransaction(transactionXdr, secret, env.networkPassphrase);
+          await endpoints.relay(intent.remittanceId, { signed_xdr: signed, method: 'fund_remittance' });
+          return { txHash: 'relayed' };
+        }
         return { txHash: 'pending' };
       },
       () => undefined,
