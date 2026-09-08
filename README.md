@@ -56,28 +56,31 @@ override per-build). The default points at `https://api.remittance.example.com`.
 
 ```bash
 npm run typecheck    # strict TS
-npm test             # Jest (jest-expo preset, 32 tests)
+npm test             # Jest (jest-expo preset, 38 tests)
 ```
 
 Coverage includes: exact stroops math, the live-status phase mapper, offline
 queue validation/drain semantics (expiry, terminal-state rejection, no double
 submit, retry counting), SEP-10 challenge signing/verification (including
-wrong-signer rejection), SEP-24 WebView origin restrictions + completion
-detection, and render tests for the onboarding flow.
+wrong-signer rejection), signing of prepared Soroban envelopes for the relay
+flow, SEP-24 WebView origin restrictions + completion detection, and render
+tests for the onboarding flow.
 
 ## Security model
 
 - **Keys**: `expo-secure-store` only. Private keys never touch AsyncStorage,
   logs, or network payloads. The session JWT lives in SecureStore too.
 - **Custody split**: non-custodial accounts sign on-device (backend prepares
-  envelopes); custodial accounts are signed server-side. The two are never
-  conflated in the UI.
+  envelopes via `/prepare-fund` and `/prepare-refund`, the app signs with the
+  device key, and `/relay` submits + verifies on-chain state before the
+  backend advances anything); custodial accounts are signed server-side. The
+  two are never conflated in the UI.
 - **SEP-24 WebView**: locked to the anchor origin (https only, subdomain
   allowance), navigation away is blocked and surfaced, completion is detected
   from redirect markers, and the user can cancel at any time.
 - **Offline queue**: persists intents, never signed envelopes. On reconnect it
-  validates quote/remittance state and rebuilds a fresh transaction — it never
-  blindly resubmits a cached envelope.
+  validates quote/remittance state, re-prepares a fresh envelope from the
+  backend, signs and relays — it never blindly resubmits a cached envelope.
 - **Biometrics**: the Security screen exposes a device-level flag that signing
   flows must check before touching keys.
 
