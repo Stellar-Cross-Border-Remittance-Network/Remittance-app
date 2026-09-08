@@ -91,8 +91,30 @@ wallet/custody architecture, including Freighter-compatible deep links.
 | Onboarding / auth | Onboarding → Auth (SEP-10) → Wallet |
 | Simple send | Send → PathPayment (real Horizon path) → OfflineQueue |
 | Remittance | Corridor → Quote → Anchor → CreateRemittance → RemittanceDetail (live timeline) |
-| Deposit / withdraw | SEP-24 WebView (or SEP-6 fallback), status reconciled from the backend |
+| Deposit / withdraw | Deposit via anchor (AUTO: SEP-24 WebView first, SEP-6 instructions fallback), status reconciled from the backend |
 | Offline recovery | OfflineQueue drains validated intents on reconnect |
+
+## SEP-6 fallback
+
+The deposit action asks the backend with `preference: AUTO` — it prefers the
+SEP-24 interactive URL (opened in the restricted WebView) and falls back to
+SEP-6 programmatic instructions (bank details, memo) shown in the
+Sep6Instructions screen when SEP-24 is genuinely unavailable. For
+non-custodial accounts the app authenticates with the anchor's WEB_AUTH_ENDPOINT
+on-device (SEP-10 with the device keypair) and passes the anchor JWT to the
+backend; custodial accounts let the backend derive it from the stored secret.
+
+## E2E (Detox)
+
+Detox specs live in `e2e/` (onboarding boot + navigation smoke). They require
+a native build:
+
+```bash
+npx expo prebuild --platform ios     # or --platform android
+npm run e2e:ios                      # or npm run e2e:android
+```
+
+These need a simulator/emulator and are not part of `npm test`.
 
 ## Testnet notes
 
