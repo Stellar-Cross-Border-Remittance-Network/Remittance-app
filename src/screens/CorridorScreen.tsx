@@ -23,8 +23,8 @@ export function CorridorScreen({ navigation }: Props) {
             onPress={() =>
               navigation.navigate('Quote', {
                 corridor: corridor.id,
-                sourceAsset: 'USDC:GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NOZ4X6K4ZD7Y6ZB',
-                destinationAsset: 'NGN:GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NOZ4X6K4ZD7Y6ZB',
+                sourceAsset: 'USDC:GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5',
+                destinationAsset: 'NGN:GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5',
               })
             }
           />

@@ -49,7 +49,7 @@ export function SendScreen({ navigation }: Props) {
       </Field>
 
       <Field label="Destination asset">
-        {['XLM', 'USDC:GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NOZ4X6K4ZD7Y6ZB'].map((asset) => (
+        {['XLM', 'USDC:GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5'].map((asset) => (
           <Button
             key={asset}
             label={asset.split(':')[0]}

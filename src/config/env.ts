@@ -22,9 +22,9 @@ export type Env = typeof env;
 
 /** Assets the app knows about (issuers are testnet well-known values). */
 export const SUPPORTED_ASSETS = [
-  { code: 'USDC', issuer: 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NOZ4X6K4ZD7Y6ZB', label: 'USDC' },
+  { code: 'USDC', issuer: 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5', label: 'USDC' },
   { code: 'XLM', issuer: undefined, label: 'XLM (native)' },
-  { code: 'NGN', issuer: 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NOZ4X6K4ZD7Y6ZB', label: 'NGN' },
+  { code: 'NGN', issuer: 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5', label: 'NGN' },
 ] as const;
 
 export const CORRIDORS = [
