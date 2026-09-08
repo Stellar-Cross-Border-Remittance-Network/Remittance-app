@@ -17,5 +17,7 @@ jobs:
       - run: npm ci
       - name: Typecheck
         run: npm run typecheck
-      - name: Tests
-        run: npm run test:ci
+      # Coverage thresholds (80% lines/functions/statements, 70% branches)
+      # are enforced in jest.config.js, so this is the coverage gate.
+      - name: Tests + coverage gate
+        run: npm run test:ci -- --coverage

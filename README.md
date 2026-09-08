@@ -55,16 +55,28 @@ override per-build). The default points at `https://api.remittance.example.com`.
 ## Testing
 
 ```bash
-npm run typecheck    # strict TS
-npm test             # Jest (jest-expo preset, 38 tests)
+npm run typecheck        # strict TS
+npm test                 # Jest (jest-expo preset, 96 tests)
+npm run test:ci -- --coverage   # coverage gate (thresholds in jest.config.js)
 ```
 
-Coverage includes: exact stroops math, the live-status phase mapper, offline
-queue validation/drain semantics (expiry, terminal-state rejection, no double
+The unit suite covers the logic layers — `lib/`, `services/`, `queue/`, `store/`
+and `config/` — at 98%+ lines: exact stroops math, the API client (auth header,
+error mapping, timeouts), the live-status phase mapper, offline queue
+validation/drain semantics (expiry, terminal-state rejection, no double
 submit, retry counting), SEP-10 challenge signing/verification (including
-wrong-signer rejection), signing of prepared Soroban envelopes for the relay
-flow, SEP-24 WebView origin restrictions + completion detection, and render
-tests for the onboarding flow.
+wrong-signer rejection), on-device anchor SEP-10, account balance
+normalization, the deposit routing/fallback flow, streaming status polling,
+signing of prepared Soroban envelopes for the relay flow, SEP-24 WebView
+origin restrictions + completion detection, and render tests for the
+onboarding flow.
+
+Coverage thresholds (80% lines/functions/statements, 70% branches) are
+enforced in `jest.config.js` and gated in CI. **Scope note**: screens,
+navigation and presentational components are deliberately excluded from the
+unit coverage scope — they are exercised by the Detox e2e suite (`e2e/`)
+against a device/simulator, which is the honest way to test UI flows like the
+SEP-24 WebView and the SEP-10 custody screens.
 
 ## Security model
 

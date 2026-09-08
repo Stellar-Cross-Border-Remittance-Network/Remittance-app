@@ -9,4 +9,24 @@ module.exports = {
   testMatch: ['<rootDir>/tests/**/*.test.ts?(x)'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
   clearMocks: true,
+  collectCoverageFrom: [
+    // The logic layers the unit suite is responsible for. Screens, navigation
+    // and presentational components are excluded deliberately: they are
+    // covered by the Detox e2e suite (e2e/) and are not meaningfully
+    // unit-testable without a full RN render tree.
+    'src/lib/**/*.ts',
+    'src/services/**/*.ts',
+    'src/queue/**/*.ts',
+    'src/store/**/*.ts',
+    'src/config/**/*.ts',
+    '!src/**/*.test.ts',
+  ],
+  coverageThreshold: {
+    global: {
+      lines: 80,
+      functions: 80,
+      statements: 80,
+      branches: 70,
+    },
+  },
 };
