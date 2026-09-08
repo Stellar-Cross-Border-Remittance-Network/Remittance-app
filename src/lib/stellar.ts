@@ -19,6 +19,18 @@ export function signChallenge(challengeXdr: string, secret: string, passphrase: 
   return tx.toXDR();
 }
 
+/**
+ * Sign a prepared (simulated, unsigned) Soroban envelope with the device
+ * keypair so it can be relayed to the backend for submission. The envelope
+ * already carries the correct sequence/auth from the backend's simulation;
+ * we only add the signature. Returns the signed base64 XDR.
+ */
+export function signTransaction(envelopeXdr: string, secret: string, passphrase: string = env.networkPassphrase): string {
+  const tx = new Transaction(envelopeXdr, passphrase);
+  tx.sign(Keypair.fromSecret(secret));
+  return tx.toXDR();
+}
+
 /** Validate a challenge for the given server account and domains. */
 export function validateChallenge(
   signedXdr: string,

@@ -88,6 +88,13 @@ export const endpoints = {
   refund: (id: string) => api<Record<string, unknown>>(`/v1/remittances/${id}/refund`, { method: 'POST', auth: true }),
   confirmSoroban: (id: string, payload: { tx_hash: string; method: string }) =>
     api<{ ok: boolean }>(`/v1/remittances/${id}/confirm-soroban`, { method: 'POST', auth: true, body: payload }),
+  prepareFund: (id: string) =>
+    api<{ transactionXdr: string }>(`/v1/remittances/${id}/prepare-fund`, { method: 'POST', auth: true }),
+  prepareRefund: (id: string) =>
+    api<{ transactionXdr: string }>(`/v1/remittances/${id}/prepare-refund`, { method: 'POST', auth: true }),
+  /** Submit a device-signed Soroban envelope; the backend verifies on-chain state. */
+  relay: (id: string, payload: { signed_xdr: string; method: 'create_remittance' | 'fund_remittance' | 'refund' }) =>
+    api<{ ok: boolean }>(`/v1/remittances/${id}/relay`, { method: 'POST', auth: true, body: payload }),
   sep24Deposit: (payload: Record<string, unknown>) =>
     api<{ id: string; url?: string; status: string }>('/v1/sep24/deposit', { method: 'POST', auth: true, body: payload }),
   sep24Withdraw: (payload: Record<string, unknown>) =>

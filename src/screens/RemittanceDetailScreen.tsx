@@ -4,11 +4,16 @@ import { Text, View } from 'react-native';
 
 import { Button, Card, Screen, StatusBadge, StatusTimeline, Subtitle, Title } from '../components/ui';
 import { endpoints } from '../lib/api';
+import { getSecure, SecureKeys } from '../lib/secureStore';
+import { signTransaction } from '../lib/stellar';
 import { formatAmount } from '../lib/stroops';
+import { enqueueIntent, removeIntent } from '../queue/offlineQueue';
 import { useRemittanceStream } from '../services/streamingService';
 import { initiateAnchorDeposit } from '../services/sepFlow';
 import { useAnchorFlow } from '../store/anchorFlowStore';
+import { useAuthStore } from '../store/authStore';
 import { colors, spacing } from '../theme/theme';
+import { env } from '../config/env';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RemittanceDetail'>;
@@ -33,8 +38,11 @@ export function RemittanceDetailScreen({ navigation, route }: Props) {
   const [remittance, setRemittance] = useState<RemittanceRecord | null>(null);
   const [depositBusy, setDepositBusy] = useState(false);
   const [depositError, setDepositError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
   const { events, connected } = useRemittanceStream(id);
   const anchorFlow = useAnchorFlow((s) => s.context);
+  const session = useAuthStore((s) => s.session);
 
   const refresh = async () => {
     try {
@@ -50,6 +58,75 @@ export function RemittanceDetailScreen({ navigation, route }: Props) {
   }, [id]);
 
   const terminal = remittance ? ['RELEASED', 'REFUNDED', 'EXPIRED'].includes(remittance.status) : false;
+
+  /**
+   * Sign a prepared envelope with the device key (non-custodial) and relay it
+   * to the backend, which submits it and only advances state after verifying
+   * the contract moved. Custodial accounts are signed server-side instead.
+   */
+  const fundEscrow = async () => {
+    setActionBusy(true);
+    setActionError(null);
+    // Persist the intent FIRST: if connectivity drops mid-fund, the offline
+    // queue rebuilds a fresh envelope (via prepare-fund) and relays it when
+    // back online — never a stale signed transaction.
+    const intentId = `fund-${Date.now()}`;
+    await enqueueIntent({
+      id: intentId,
+      kind: 'remittance_fund',
+      remittanceId: id,
+      sourceAccount: session?.account ?? '',
+      assetIn: remittance?.source_asset.split(':')[0] ?? 'USDC',
+      amountIn: remittance?.source_amount ?? '',
+      createdAt: Date.now(),
+      expiry: remittance ? new Date(remittance.expiry).getTime() : Date.now() + 30 * 60 * 1000,
+      label: `Fund remittance ${id.slice(0, 8)}`,
+    });
+    try {
+      if (session?.custody === 'non_custodial') {
+        const secret = await getSecure(SecureKeys.localSecret);
+        if (!secret) {
+          throw new Error('No device key found — re-authenticate first.');
+        }
+        const { transactionXdr } = await endpoints.prepareFund(id);
+        const signed = signTransaction(transactionXdr, secret, env.networkPassphrase);
+        await endpoints.relay(id, { signed_xdr: signed, method: 'fund_remittance' });
+      } else {
+        await endpoints.fund(id);
+      }
+      await removeIntent(intentId);
+      await refresh();
+    } catch (e) {
+      // The intent stays queued for the retry-on-reconnect path.
+      setActionError((e as Error).message);
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  /** Sender-cancel of a funded, pre-processing remittance. */
+  const cancelRemittance = async () => {
+    setActionBusy(true);
+    setActionError(null);
+    try {
+      if (session?.custody === 'non_custodial') {
+        const secret = await getSecure(SecureKeys.localSecret);
+        if (!secret) {
+          throw new Error('No device key found — re-authenticate first.');
+        }
+        const { transactionXdr } = await endpoints.prepareRefund(id);
+        const signed = signTransaction(transactionXdr, secret, env.networkPassphrase);
+        await endpoints.relay(id, { signed_xdr: signed, method: 'refund' });
+      } else {
+        await endpoints.refund(id);
+      }
+      await refresh();
+    } catch (e) {
+      setActionError((e as Error).message);
+    } finally {
+      setActionBusy(false);
+    }
+  };
 
   /**
    * Deposit via the chosen anchor: AUTO preference on the backend tries
@@ -141,16 +218,16 @@ export function RemittanceDetailScreen({ navigation, route }: Props) {
             <>
               <View style={{ flexDirection: 'row', gap: spacing.md }}>
                 <Button
-                  label="Fund escrow"
-                  onPress={async () => {
-                    await endpoints.fund(id);
-                    void refresh();
-                  }}
+                  label={remittance.status === 'CREATED' ? 'Fund escrow' : 'Refresh'}
+                  onPress={() => (remittance.status === 'CREATED' ? void fundEscrow() : void refresh())}
+                  loading={actionBusy}
                   style={{ flex: 1 }}
                 />
-                <Button label="Refresh" variant="secondary" onPress={() => void refresh()} style={{ flex: 1 }} />
+                {remittance.status === 'FUNDED' && (
+                  <Button label="Cancel" variant="secondary" onPress={() => void cancelRemittance()} style={{ flex: 1 }} />
+                )}
               </View>
-              {anchorFlow && (
+              {anchorFlow && remittance.status === 'CREATED' && (
                 <Button
                   label="Deposit via anchor (SEP-24 / SEP-6)"
                   onPress={() => void depositViaAnchor()}
@@ -158,8 +235,10 @@ export function RemittanceDetailScreen({ navigation, route }: Props) {
                   style={{ marginTop: spacing.sm }}
                 />
               )}
-              {depositError && (
-                <Text style={{ color: colors.danger.text, fontSize: 12, marginTop: spacing.sm }}>{depositError}</Text>
+              {(depositError || actionError) && (
+                <Text style={{ color: colors.danger.text, fontSize: 12, marginTop: spacing.sm }}>
+                  {actionError ?? depositError}
+                </Text>
               )}
             </>
           )}

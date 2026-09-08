@@ -4,11 +4,13 @@ import { Text, TextInput, View } from 'react-native';
 
 import { Button, Card, Field, Screen, Subtitle, Title } from '../components/ui';
 import { endpoints } from '../lib/api';
-import { isValidPublicKey } from '../lib/stellar';
+import { getSecure, SecureKeys } from '../lib/secureStore';
+import { isValidPublicKey, signTransaction } from '../lib/stellar';
 import { enqueueIntent } from '../queue/offlineQueue';
 import { useAuthStore } from '../store/authStore';
 import { useAnchorFlow } from '../store/anchorFlowStore';
 import { colors, spacing } from '../theme/theme';
+import { env } from '../config/env';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CreateRemittance'>;
@@ -18,6 +20,7 @@ interface CreateResult {
   status: string;
   approval_required?: boolean;
   approval?: { method: string; transactionXdr: string };
+  contract_remittance_id?: string;
 }
 
 /**
@@ -44,11 +47,28 @@ export function CreateRemittanceScreen({ navigation, route }: Props) {
     try {
       const res = (await endpoints.createRemittance({
         quote_id: quoteId,
-        sender_account_id: '', // backend resolves from the session account
+        // The backend resolves the sender from the session account.
         recipient_address: recipientAddress,
         recipient_stellar_account: recipientStellar.trim(),
         anchor_id: anchorId,
       })) as unknown as CreateResult;
+      // Non-custodial: the backend prepared an unsigned create envelope.
+      // Sign it on-device (the secret never leaves SecureStore) and relay it
+      // back for submission; the backend only advances state after verifying
+      // the contract actually created the commitment.
+      if (res.approval_required && res.approval?.transactionXdr) {
+        const secret = await getSecure(SecureKeys.localSecret);
+        if (secret) {
+          const signed = signTransaction(res.approval.transactionXdr, secret, env.networkPassphrase);
+          await endpoints.relay(res.id, { signed_xdr: signed, method: 'create_remittance' });
+          res.approval_required = false;
+          res.contract_remittance_id = undefined;
+        } else {
+          setError('No device key found — re-authenticate or connect your wallet.');
+          setBusy(false);
+          return;
+        }
+      }
       setResult(res);
       // Remember the anchor so the detail screen can offer the deposit
       // action (SEP-24 first, SEP-6 fallback) with the right context.

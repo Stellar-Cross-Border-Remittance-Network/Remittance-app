@@ -1,6 +1,15 @@
-import { Keypair, WebAuth } from '@stellar/stellar-sdk';
+import { Account, Asset, Keypair, Operation, TransactionBuilder, WebAuth } from '@stellar/stellar-sdk';
 
-import { generateKeypair, isValidPublicKey, isValidSecret, parseAsset, shortKey, signChallenge, validateChallenge } from '../src/lib/stellar';
+import {
+  generateKeypair,
+  isValidPublicKey,
+  isValidSecret,
+  parseAsset,
+  shortKey,
+  signChallenge,
+  signTransaction,
+  validateChallenge,
+} from '../src/lib/stellar';
 
 const PASSPHRASE = 'Test SDF Network ; September 2015';
 const HOME_DOMAIN = 'testanchor.stellar.org';
@@ -63,5 +72,34 @@ describe('stellar helpers', () => {
     const kp = Keypair.random().publicKey();
     expect(shortKey(kp)).toMatch(/…/);
     expect(shortKey('GABC', 2, 2)).toBe('GABC');
+  });
+
+  it('signs a prepared (unsigned) envelope like the backend relay flow', () => {
+    const kp = Keypair.random();
+    // A prepared Soroban envelope is an unsigned tx built by the backend; the
+    // app only adds its signature. Account(server, '-1') mirrors how the SDK
+    // builds challenge transactions (sequence 0 after the increment).
+    const unsigned = new TransactionBuilder(new Account(kp.publicKey(), '-1'), {
+      fee: '100',
+      networkPassphrase: PASSPHRASE,
+    })
+      .addOperation(
+        Operation.payment({
+          destination: Keypair.random().publicKey(),
+          asset: Asset.native(),
+          amount: '1',
+        }),
+      )
+      .setTimeout(300)
+      .build()
+      .toXDR();
+
+    const signed = signTransaction(unsigned, kp.secret(), PASSPHRASE);
+    expect(signed).not.toBe(unsigned);
+    // The signed envelope parses and carries exactly one signature.
+    const { Transaction } = require('@stellar/stellar-sdk') as typeof import('@stellar/stellar-sdk');
+    const parsed = new Transaction(signed, PASSPHRASE);
+    expect(parsed.signatures).toHaveLength(1);
+    expect(parsed.source).toBe(kp.publicKey());
   });
 });
