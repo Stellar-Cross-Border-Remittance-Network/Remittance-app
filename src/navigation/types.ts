@@ -23,6 +23,11 @@ export type RootStackParamList = {
     remittanceId?: string;
     expectedResult: 'deposit' | 'withdraw';
   };
+  Sep6Instructions: {
+    sepTransactionId: string;
+    remittanceId?: string;
+    instructions: Record<string, unknown>;
+  };
   RemittanceDetail: { id: string };
   PathPayment: undefined;
   Activity: undefined;

@@ -13,6 +13,7 @@ import { QuoteScreen } from '../screens/QuoteScreen';
 import { AnchorSelectionScreen } from '../screens/AnchorSelectionScreen';
 import { CreateRemittanceScreen } from '../screens/CreateRemittanceScreen';
 import { Sep24WebViewScreen } from '../screens/Sep24WebViewScreen';
+import { Sep6InstructionsScreen } from '../screens/Sep6InstructionsScreen';
 import { RemittanceDetailScreen } from '../screens/RemittanceDetailScreen';
 import { PathPaymentScreen } from '../screens/PathPaymentScreen';
 import { ActivityScreen } from '../screens/ActivityScreen';
@@ -47,6 +48,7 @@ export function RootNavigator() {
         component={Sep24WebViewScreen}
         options={{ title: 'Anchor flow', headerShown: false }}
       />
+      <Stack.Screen name="Sep6Instructions" component={Sep6InstructionsScreen} options={{ title: 'Transfer instructions' }} />
       <Stack.Screen name="RemittanceDetail" component={RemittanceDetailScreen} options={{ title: 'Remittance' }} />
       <Stack.Screen name="PathPayment" component={PathPaymentScreen} options={{ title: 'Path payment' }} />
       <Stack.Screen name="Activity" component={ActivityScreen} options={{ title: 'Activity' }} />

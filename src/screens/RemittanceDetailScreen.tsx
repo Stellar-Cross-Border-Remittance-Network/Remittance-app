@@ -6,6 +6,8 @@ import { Button, Card, Screen, StatusBadge, StatusTimeline, Subtitle, Title } fr
 import { endpoints } from '../lib/api';
 import { formatAmount } from '../lib/stroops';
 import { useRemittanceStream } from '../services/streamingService';
+import { initiateAnchorDeposit } from '../services/sepFlow';
+import { useAnchorFlow } from '../store/anchorFlowStore';
 import { colors, spacing } from '../theme/theme';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -29,7 +31,10 @@ interface RemittanceRecord {
 export function RemittanceDetailScreen({ navigation, route }: Props) {
   const { id } = route.params;
   const [remittance, setRemittance] = useState<RemittanceRecord | null>(null);
+  const [depositBusy, setDepositBusy] = useState(false);
+  const [depositError, setDepositError] = useState<string | null>(null);
   const { events, connected } = useRemittanceStream(id);
+  const anchorFlow = useAnchorFlow((s) => s.context);
 
   const refresh = async () => {
     try {
@@ -45,6 +50,50 @@ export function RemittanceDetailScreen({ navigation, route }: Props) {
   }, [id]);
 
   const terminal = remittance ? ['RELEASED', 'REFUNDED', 'EXPIRED'].includes(remittance.status) : false;
+
+  /**
+   * Deposit via the chosen anchor: AUTO preference on the backend tries
+   * SEP-24 (interactive WebView) first and falls back to SEP-6 (programmatic
+   * instructions) when SEP-24 is genuinely unavailable.
+   */
+  const depositViaAnchor = async () => {
+    if (!anchorFlow) {
+      setDepositError('No anchor context — start a remittance from the corridor flow.');
+      return;
+    }
+    setDepositBusy(true);
+    setDepositError(null);
+    try {
+      const result = await initiateAnchorDeposit({
+        anchorId: anchorFlow.anchorId,
+        anchorWebAuthEndpoint: anchorFlow.anchorWebAuthEndpoint,
+        assetCode: anchorFlow.assetCode,
+        amount: anchorFlow.amount,
+        account: anchorFlow.account,
+        custody: anchorFlow.custody,
+        countryCode: anchorFlow.countryCode,
+        remittanceId: id,
+      });
+      if (result.protocol === 'sep24') {
+        navigation.navigate('Sep24WebView', {
+          url: result.url,
+          sepTransactionId: result.id,
+          remittanceId: id,
+          expectedResult: 'deposit',
+        });
+      } else {
+        navigation.navigate('Sep6Instructions', {
+          sepTransactionId: result.id,
+          remittanceId: id,
+          instructions: result.instructions,
+        });
+      }
+    } catch (e) {
+      setDepositError((e as Error).message);
+    } finally {
+      setDepositBusy(false);
+    }
+  };
 
   return (
     <Screen>
@@ -89,17 +138,30 @@ export function RemittanceDetailScreen({ navigation, route }: Props) {
           </Card>
 
           {!terminal && (
-            <View style={{ flexDirection: 'row', gap: spacing.md }}>
-              <Button
-                label="Fund escrow"
-                onPress={async () => {
-                  await endpoints.fund(id);
-                  void refresh();
-                }}
-                style={{ flex: 1 }}
-              />
-              <Button label="Refresh" variant="secondary" onPress={() => void refresh()} style={{ flex: 1 }} />
-            </View>
+            <>
+              <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                <Button
+                  label="Fund escrow"
+                  onPress={async () => {
+                    await endpoints.fund(id);
+                    void refresh();
+                  }}
+                  style={{ flex: 1 }}
+                />
+                <Button label="Refresh" variant="secondary" onPress={() => void refresh()} style={{ flex: 1 }} />
+              </View>
+              {anchorFlow && (
+                <Button
+                  label="Deposit via anchor (SEP-24 / SEP-6)"
+                  onPress={() => void depositViaAnchor()}
+                  loading={depositBusy}
+                  style={{ marginTop: spacing.sm }}
+                />
+              )}
+              {depositError && (
+                <Text style={{ color: colors.danger.text, fontSize: 12, marginTop: spacing.sm }}>{depositError}</Text>
+              )}
+            </>
           )}
 
           <Text style={{ color: colors.muted, fontSize: 12, marginTop: spacing.sm }}>

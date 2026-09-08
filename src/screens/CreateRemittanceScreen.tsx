@@ -7,6 +7,7 @@ import { endpoints } from '../lib/api';
 import { isValidPublicKey } from '../lib/stellar';
 import { enqueueIntent } from '../queue/offlineQueue';
 import { useAuthStore } from '../store/authStore';
+import { useAnchorFlow } from '../store/anchorFlowStore';
 import { colors, spacing } from '../theme/theme';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -49,6 +50,17 @@ export function CreateRemittanceScreen({ navigation, route }: Props) {
         anchor_id: anchorId,
       })) as unknown as CreateResult;
       setResult(res);
+      // Remember the anchor so the detail screen can offer the deposit
+      // action (SEP-24 first, SEP-6 fallback) with the right context.
+      const previous = useAnchorFlow.getState().context;
+      useAnchorFlow.getState().setContext({
+        anchorId,
+        anchorWebAuthEndpoint: previous?.anchorWebAuthEndpoint ?? null,
+        assetCode: 'USDC',
+        amount: sourceAmount,
+        account: session.account,
+        custody: session.custody,
+      });
 
       await enqueueIntent({
         id: `intent-${Date.now()}`,

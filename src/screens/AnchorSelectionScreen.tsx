@@ -6,6 +6,8 @@ import { Text, TextInput } from 'react-native';
 import { Button, Card, Field, Screen, Subtitle, Title } from '../components/ui';
 import { cacheGet, cacheSet, CacheKeys } from '../lib/cache';
 import { endpoints } from '../lib/api';
+import { useAnchorFlow } from '../store/anchorFlowStore';
+import { useAuthStore } from '../store/authStore';
 import { colors, spacing } from '../theme/theme';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -14,6 +16,9 @@ type Props = NativeStackScreenProps<RootStackParamList, 'AnchorSelection'>;
 export interface AnchorRow {
   id: string;
   home_domain: string;
+  web_auth_endpoint: string | null;
+  transfer_server_sep24: string | null;
+  transfer_server_sep6: string | null;
   sep24_enabled: boolean;
   sep6_enabled: boolean;
   deposit_enabled: boolean;
@@ -25,6 +30,7 @@ export interface AnchorRow {
 export function AnchorSelectionScreen({ navigation, route }: Props) {
   const { quoteId = '', sourceAmount = '' } = route.params ?? {};
   const [recipient, setRecipient] = useState('');
+  const session = useAuthStore((s) => s.session);
 
   const { data: anchors, isLoading } = useQuery({
     queryKey: ['anchors'],
@@ -66,14 +72,25 @@ export function AnchorSelectionScreen({ navigation, route }: Props) {
           <Button
             label="Use this anchor"
             disabled={!recipient.trim()}
-            onPress={() =>
+            onPress={() => {
+              // Remember the anchor's SEP-10 endpoint so the deposit step can
+              // authenticate non-custodial accounts on-device.
+              if (session) {
+                useAnchorFlow.getState().setContext({
+                  anchorId: a.id,
+                  anchorWebAuthEndpoint: a.web_auth_endpoint,
+                  assetCode: 'USDC',
+                  account: session.account,
+                  custody: session.custody,
+                });
+              }
               navigation.navigate('CreateRemittance', {
                 quoteId,
                 sourceAmount,
                 anchorId: a.id,
                 recipientAddress: recipient.trim(),
-              })
-            }
+              });
+            }}
           />
         </Card>
       ))}

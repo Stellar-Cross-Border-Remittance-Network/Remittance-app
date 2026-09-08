@@ -92,10 +92,11 @@ export const endpoints = {
     api<{ id: string; url?: string; status: string }>('/v1/sep24/deposit', { method: 'POST', auth: true, body: payload }),
   sep24Withdraw: (payload: Record<string, unknown>) =>
     api<{ id: string; url?: string; status: string }>('/v1/sep24/withdraw', { method: 'POST', auth: true, body: payload }),
+  sep6Transaction: (id: string) => api<Record<string, unknown>>(`/v1/sep6/transactions/${id}`, { auth: true }),
   sep6Deposit: (payload: Record<string, unknown>) =>
-    api<{ id: string; protocol: string; url?: string; status: string }>('/v1/sep6/deposit', { method: 'POST', auth: true, body: payload }),
+    api<{ id: string; protocol: string; url?: string; status: string; instructions?: Record<string, unknown> }>('/v1/sep6/deposit', { method: 'POST', auth: true, body: payload }),
   sep6Withdraw: (payload: Record<string, unknown>) =>
-    api<{ id: string; protocol: string; url?: string; status: string }>('/v1/sep6/withdraw', { method: 'POST', auth: true, body: payload }),
+    api<{ id: string; protocol: string; url?: string; status: string; instructions?: Record<string, unknown> }>('/v1/sep6/withdraw', { method: 'POST', auth: true, body: payload }),
   pathPlan: (payload: Record<string, unknown>) =>
     api<{ paths: unknown[]; best: unknown }>('/v1/path-payments/plan', { method: 'POST', auth: true, body: payload }),
 };
