@@ -25,7 +25,7 @@
       "expo-secure-store"
     ],
     "extra": {
-      "apiBaseUrl": "https://api.remittance.example.com"
+      "apiBaseUrl": "http://localhost:8080"
     },
     "userInterfaceStyle": "dark"
   }
