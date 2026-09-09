@@ -56,6 +56,9 @@ export async function authenticate(
       body: { transaction: signed, account, custody: 'non_custodial' },
     });
     await setSecure(SecureKeys.sessionToken, verify.token);
+    // Register the device key against the session identity so the backend can
+    // resolve the sender account when a remittance is created. Idempotent.
+    await registerAccount(account);
     return { account, custody: 'non_custodial' };
   }
 
@@ -74,6 +77,35 @@ export async function authenticate(
   });
   await setSecure(SecureKeys.sessionToken, verify.token);
   return { account, custody: 'custodial' };
+}
+
+/**
+ * Register the device's public key with the backend (non-custodial).
+ * Requires the session token to already be stored; the backend maps the
+ * JWT subject (the same public key) to a users row, then links this account.
+ */
+export async function registerAccount(publicKey: string): Promise<void> {
+  await api<{ id: string; public_key: string; custody: string; is_default: boolean }>('/v1/accounts', {
+    method: 'POST',
+    auth: true,
+    body: { custody: 'non_custodial', public_key: publicKey },
+  });
+}
+
+/**
+ * Custodial onboarding: the backend issues a fresh account and returns the
+ * secret exactly once. The app stores it in SecureStore — the backend keeps
+ * only the encrypted form and signs SEP-10 challenges on the user's behalf.
+ */
+export async function createCustodialAccount(): Promise<{ publicKey: string; secret: string }> {
+  const issued = await api<{ user_id: string; account_id: string; public_key: string; secret: string; network: string }>(
+    '/v1/accounts/custodial',
+    { method: 'POST', body: { network: 'testnet' } },
+  );
+  await setSecure(SecureKeys.custodialSecret, issued.secret);
+  await setSecure(SecureKeys.activeAccount, issued.public_key);
+  await setSecure(SecureKeys.custodyModel, 'custodial');
+  return { publicKey: issued.public_key, secret: issued.secret };
 }
 
 /** Sign out: wipe the session and all locally held secrets. */

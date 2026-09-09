@@ -1,6 +1,6 @@
 import { Account, BASE_FEE, Keypair, Operation, TransactionBuilder } from '@stellar/stellar-sdk';
 
-import { authenticate, signOut } from '../src/services/authService';
+import { authenticate, createCustodialAccount, signOut } from '../src/services/authService';
 import { api } from '../src/lib/api';
 import { deleteSecure, getSecure, SecureKeys, setSecure } from '../src/lib/secureStore';
 
@@ -45,7 +45,7 @@ describe('authenticate (non-custodial)', () => {
     const result = await authenticate('non_custodial');
     expect(result.custody).toBe('non_custodial');
     expect(result.account).toMatch(/^G[A-Z0-9]{55}$/);
-    expect(mockApi).toHaveBeenCalledTimes(2);
+    expect(mockApi).toHaveBeenCalledTimes(3);
     expect(await getSecure(SecureKeys.sessionToken)).toBe('jwt');
     const deviceSecret = await getSecure(SecureKeys.localSecret);
     expect(deviceSecret).toBeTruthy();
@@ -53,6 +53,10 @@ describe('authenticate (non-custodial)', () => {
     // The second api call must carry the signed challenge and non-custodial flag.
     const verifyPayload = mockApi.mock.calls[1]![1] as { body: { custody: string } };
     expect(verifyPayload.body.custody).toBe('non_custodial');
+    // The third call registers the device key with the backend (idempotent).
+    const registerCall = mockApi.mock.calls[2]!;
+    expect(registerCall[0]).toBe('/v1/accounts');
+    expect((registerCall[1] as { body: { custody: string; public_key: string } }).body.custody).toBe('non_custodial');
   });
 
   it('reuses an existing device secret', async () => {
@@ -95,6 +99,27 @@ describe('authenticate (custodial)', () => {
     expect(result.custody).toBe('custodial');
     expect(await getSecure(SecureKeys.sessionToken)).toBe('jwt-c');
     expect(await getSecure(SecureKeys.custodialSecret)).toBe(kp.secret());
+  });
+});
+
+describe('createCustodialAccount', () => {
+  it('issues a server-side account, stores the secret once, and returns the key', async () => {
+    const kp = Keypair.random();
+    mockApi.mockResolvedValueOnce({
+      user_id: 'u1',
+      account_id: 'a1',
+      public_key: kp.publicKey(),
+      secret: kp.secret(),
+      network: 'testnet',
+    });
+
+    const issued = await createCustodialAccount();
+    expect(issued.publicKey).toBe(kp.publicKey());
+    expect(issued.secret).toBe(kp.secret());
+    expect(mockApi).toHaveBeenCalledWith('/v1/accounts/custodial', expect.objectContaining({ method: 'POST' }));
+    expect(await getSecure(SecureKeys.custodialSecret)).toBe(kp.secret());
+    expect(await getSecure(SecureKeys.activeAccount)).toBe(kp.publicKey());
+    expect(await getSecure(SecureKeys.custodyModel)).toBe('custodial');
   });
 });
 

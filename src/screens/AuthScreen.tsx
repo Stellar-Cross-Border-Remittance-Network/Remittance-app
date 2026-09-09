@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 
 import { Button, Card, Field, Screen, Subtitle, Title } from '../components/ui';
-import { authenticate } from '../services/authService';
+import { authenticate, createCustodialAccount } from '../services/authService';
 import { useAuthStore } from '../store/authStore';
 import { colors, spacing } from '../theme/theme';
 import type { RootStackParamList } from '../navigation/types';
@@ -22,11 +22,29 @@ export function AuthScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const setSession = useAuthStore((s) => s.setSession);
 
-  const signIn = async () => {
+  /** Issue a custodial account server-side, store its secret, then sign in. */
+  const onCreateCustodial = async () => {
     setBusy(true);
     setError(null);
     try {
-      const result = await authenticate(custody, custody === 'custodial' ? { secret: custodialSecret } : {});
+      const { secret } = await createCustodialAccount();
+      setCustodialSecret(secret);
+      await signIn(secret);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const signIn = async (secretOverride?: string) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await authenticate(
+        custody,
+        custody === 'custodial' ? { secret: secretOverride ?? custodialSecret } : {},
+      );
       await setSession({ token: '', account: result.account, custody: result.custody });
       // Session token is stored by the service; reload it into the store.
       const { getSecure, SecureKeys } = await import('../lib/secureStore');
@@ -73,17 +91,26 @@ export function AuthScreen({ navigation }: Props) {
       </Card>
 
       {custody === 'custodial' && (
-        <Field label="Backend-issued account secret">
-          <TextInput
-            value={custodialSecret}
-            onChangeText={setCustodialSecret}
-            secureTextEntry
-            autoCapitalize="none"
-            placeholder="S…"
-            placeholderTextColor={colors.muted}
-            style={inputStyle}
+        <>
+          <Field label="Backend-issued account secret">
+            <TextInput
+              value={custodialSecret}
+              onChangeText={setCustodialSecret}
+              secureTextEntry
+              autoCapitalize="none"
+              placeholder="S…"
+              placeholderTextColor={colors.muted}
+              style={inputStyle}
+            />
+          </Field>
+          <Button
+            label="Create a custodial account"
+            variant="secondary"
+            onPress={() => void onCreateCustodial()}
+            loading={busy}
+            style={{ marginBottom: spacing.md }}
           />
-        </Field>
+        </>
       )}
 
       {error && <Text style={{ color: colors.danger.text, marginBottom: spacing.md }}>{error}</Text>}

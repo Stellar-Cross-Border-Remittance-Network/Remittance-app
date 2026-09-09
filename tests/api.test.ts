@@ -176,6 +176,8 @@ describe('endpoint helpers', () => {
 
     const calls: Array<[() => Promise<unknown>, RegExp, string?]> = [
       [() => endpoints.verify({ transaction: 'x', account: 'GAAA' }), /\/v1\/sep10\/verify$/, 'POST'],
+      [() => endpoints.registerAccount({ custody: 'non_custodial', public_key: 'GAAA' }), /\/v1\/accounts$/, 'POST'],
+      [() => endpoints.createCustodialAccount(), /\/v1\/accounts\/custodial$/, 'POST'],
       [() => endpoints.anchors(), /\/v1\/anchors$/],
       [() => endpoints.anchor('a1'), /\/v1\/anchors\/a1$/],
       [() => endpoints.quote({ a: 1 }), /\/v1\/remittances\/quote$/, 'POST'],
@@ -203,8 +205,9 @@ describe('endpoint helpers', () => {
       expect(url).toMatch(path);
       expect(init.method).toBe(method ?? 'GET');
       // Auth'd helpers attach the stored token; the public SEP-10
-      // challenge/verify endpoints are the only helpers without auth.
-      if (method !== 'GET' && !url.includes('/sep10/')) {
+      // challenge/verify and custodial-issuance endpoints are the only
+      // helpers without auth.
+      if (method !== 'GET' && !url.includes('/sep10/') && !url.includes('/accounts/custodial')) {
         expect(JSON.stringify(init.headers)).toContain('Bearer sess-token');
       }
     }

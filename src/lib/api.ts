@@ -75,6 +75,12 @@ export const endpoints = {
   challenge: () => api<{ transaction: string; network_passphrase: string }>('/v1/sep10/challenge', { method: 'POST', body: {} }),
   verify: (payload: { transaction: string; account: string; custody?: 'non_custodial' | 'custodial' }) =>
     api<{ token: string; account: string; custody: string }>('/v1/sep10/verify', { method: 'POST', body: payload }),
+  /** Register the device's public key against the session identity. */
+  registerAccount: (payload: { custody: 'non_custodial'; public_key: string }) =>
+    api<{ id: string; public_key: string; custody: string; is_default: boolean }>('/v1/accounts', { method: 'POST', auth: true, body: payload }),
+  /** Issue a custodial account (server-held secret, returned exactly once). */
+  createCustodialAccount: () =>
+    api<{ user_id: string; account_id: string; public_key: string; secret: string; network: string }>('/v1/accounts/custodial', { method: 'POST', body: { network: 'testnet' } }),
   anchors: () => api<Array<Record<string, unknown>>>('/v1/anchors', { auth: true }),
   anchor: (id: string) => api<Record<string, unknown>>(`/v1/anchors/${id}`, { auth: true }),
   quote: (payload: Record<string, unknown>) =>
